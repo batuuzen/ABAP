@@ -1,0 +1,672 @@
+REPORT  z_button_deneme.
+TYPE-POOLS: slis.
+TABLES: scarr.
+
+TYPES: BEGIN OF ls_scarr ,
+        lv_chk      TYPE char1,
+        lv_carrid   TYPE scarr-carrid,
+        lv_carrname TYPE scarr-carrname,
+        lv_currcode TYPE scarr-currcode,
+        lv_url      TYPE scarr-url,
+
+
+  END OF ls_scarr.
+
+DATA:     li_scarr          TYPE TABLE OF scarr WITH HEADER LINE,
+          it_fieldcat       TYPE slis_t_fieldcat_alv,
+          wa_fieldcat       TYPE slis_fieldcat_alv,
+          lv_zodev3         TYPE char3,
+          v_form_name TYPE rs38l_fnam,
+          lt_outtab         TYPE  TABLE OF sflight WITH HEADER LINE ,
+          lv_exit(1).
+
+DATA: fieldcat TYPE slis_t_fieldcat_alv WITH HEADER LINE.
+
+START-OF-SELECTION.
+  SELECT-OPTIONS s_carrid FOR scarr-carrid.
+
+END-OF-SELECTION.
+
+  PERFORM display_alv.
+  PERFORM fieldcat.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program       = sy-repid
+      i_callback_pf_status_set = 'SUB_PF_STATUS'
+      i_callback_user_command  = 'USER_COMMAND'
+      it_fieldcat              = it_fieldcat
+    TABLES
+      t_outtab                 = li_scarr
+    EXCEPTIONS
+      program_error            = 1
+      OTHERS                   = 2.
+  IF sy-subrc NE 0.
+    MESSAGE 'Error in displaying output.' TYPE 'E'.
+  ENDIF.
+
+*&---------------------------------------------------------------------*
+*&      Form  sub_pf_status
+*&---------------------------------------------------------------------*
+*  Sub-Routine to Set the PF status
+*----------------------------------------------------------------------*
+FORM sub_pf_status USING rt_extab TYPE slis_t_extab..
+  SET PF-STATUS 'ZSTANDARD'.
+ENDFORM.                    "sub_pf_status
+
+*&---------------------------------------------------------------------*
+*&      Form  user_command
+*&---------------------------------------------------------------------*
+*   Sub-Routine to handle the click on the ALV aoutput
+*----------------------------------------------------------------------*
+FORM user_command USING r_ucomm    LIKE sy-ucomm
+                       rs_selfield TYPE slis_selfield.
+  IF r_ucomm EQ '&EPDF'.
+    DATA: i_otf TYPE itcoo OCCURS 0 WITH HEADER LINE,
+      i_tline TYPE TABLE OF tline WITH HEADER LINE,
+      i_receivers TYPE TABLE OF somlreci1 WITH HEADER LINE,
+      i_record LIKE solisti1 OCCURS 0 WITH HEADER LINE,
+* Objects to send mail.
+      i_objpack LIKE sopcklsti1 OCCURS 0 WITH HEADER LINE,
+      i_objtxt LIKE solisti1 OCCURS 0 WITH HEADER LINE,
+      i_objbin LIKE solisti1 OCCURS 0 WITH HEADER LINE,
+      i_reclist LIKE somlreci1 OCCURS 0 WITH HEADER LINE,
+* Work Area declarations
+      wa_objhead TYPE soli_tab,
+      w_ctrlop TYPE ssfctrlop,
+      w_compop TYPE ssfcompop,
+      w_return TYPE ssfcrescl,
+      wa_doc_chng TYPE sodocchgi1,
+      w_data TYPE sodocchgi1,
+      wa_buffer TYPE string, "To convert from 132 to 255
+* Variables declarations
+      v_form_name TYPE rs38l_fnam,
+      v_len_in LIKE sood-objlen,
+      v_len_out LIKE sood-objlen,
+      v_len_outn TYPE i,
+      v_lines_txt TYPE i,
+      v_lines_bin TYPE i.
+    READ TABLE li_scarr INDEX  rs_selfield-tabindex.
+
+    CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+      EXPORTING
+        formname           = 'ZSPFLI_PRINT'
+      IMPORTING
+        fm_name            = v_form_name
+      EXCEPTIONS
+        no_form            = 1
+        no_function_module = 2
+        OTHERS             = 3.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+    w_ctrlop-getotf = 'X'.
+    w_ctrlop-no_dialog = 'X'.
+    w_compop-tdnoprev = 'X'.
+    CALL FUNCTION v_form_name
+      EXPORTING
+        control_parameters = w_ctrlop
+        output_options     = w_compop
+        user_settings      = 'X'
+        wa_spfli           = li_scarr-carrid
+      IMPORTING
+        job_output_info    = w_return
+      EXCEPTIONS
+        formatting_error   = 1
+        internal_error     = 2
+        send_error         = 3
+        user_canceled      = 4
+        OTHERS             = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+    i_otf[] = w_return-otfdata[].
+    CALL FUNCTION 'CONVERT_OTF'
+      EXPORTING
+        format                = 'PDF'
+        max_linewidth         = 132
+      IMPORTING
+        bin_filesize          = v_len_in
+      TABLES
+        otf                   = i_otf
+        lines                 = i_tline
+      EXCEPTIONS
+        err_max_linewidth     = 1
+        err_format            = 2
+        err_conv_not_possible = 3
+        OTHERS                = 4.
+    IF sy-subrc <> 0.
+    ENDIF.
+    LOOP AT i_tline.
+      TRANSLATE i_tline USING '~'.
+      CONCATENATE wa_buffer i_tline INTO wa_buffer.
+    ENDLOOP.
+    TRANSLATE wa_buffer USING '~'.
+    DO.
+      i_record = wa_buffer.
+      APPEND i_record.
+      SHIFT wa_buffer LEFT BY 255 PLACES.
+      IF wa_buffer IS INITIAL.
+        EXIT.
+      ENDIF.
+    ENDDO.
+* Attachment
+    REFRESH: i_reclist,
+              i_objtxt,
+              i_objbin,
+              i_objpack.
+    CLEAR wa_objhead.
+    i_objbin[] = i_record[].
+* Create Message Body Title and Description
+    i_objtxt = 'test with pdf-Attachment!'.
+    APPEND i_objtxt.
+    DESCRIBE TABLE i_objtxt LINES v_lines_txt.
+    READ TABLE i_objtxt INDEX v_lines_txt.
+    wa_doc_chng-obj_name = 'smartform'.
+    wa_doc_chng-expiry_dat = sy-datum + 10.
+    wa_doc_chng-obj_descr = 'smartform'.
+    wa_doc_chng-sensitivty = 'F'.
+    wa_doc_chng-doc_size = v_lines_txt * 255.
+* Main Text
+    CLEAR i_objpack-transf_bin.
+    i_objpack-head_start = 1.
+    i_objpack-head_num = 0.
+    i_objpack-body_start = 1.
+    i_objpack-body_num = v_lines_txt.
+    i_objpack-doc_type = 'RAW'.
+    APPEND i_objpack.
+* Attachment (pdf-Attachment)
+    i_objpack-transf_bin = 'X'.
+    i_objpack-head_start = 1.
+    i_objpack-head_num = 0.
+    i_objpack-body_start = 1.
+    DESCRIBE TABLE i_objbin LINES v_lines_bin.
+    READ TABLE i_objbin INDEX v_lines_bin.
+    i_objpack-doc_size = v_lines_bin * 255 .
+    i_objpack-body_num = v_lines_bin.
+    i_objpack-doc_type = 'PDF'.
+    i_objpack-obj_name = 'smart'.
+    i_objpack-obj_descr = 'test'.
+    APPEND i_objpack.
+    CLEAR i_reclist.
+    i_reclist-receiver = 'ozenbatuhan1@gmail.com'.
+    i_reclist-rec_type = 'U'.
+    APPEND i_reclist.
+    CALL FUNCTION 'SO_NEW_DOCUMENT_ATT_SEND_API1'
+      EXPORTING
+        document_data              = wa_doc_chng
+        put_in_outbox              = 'X'
+        commit_work                = 'X'
+      TABLES
+        packing_list               = i_objpack
+        object_header              = wa_objhead
+        contents_bin               = i_objbin
+        contents_txt               = i_objtxt
+        receivers                  = i_reclist
+      EXCEPTIONS
+        too_many_receivers         = 1
+        document_not_sent          = 2
+        document_type_not_exist    = 3
+        operation_no_authorization = 4
+        parameter_error            = 5
+        x_error                    = 6
+        enqueue_error              = 7
+        OTHERS                     = 8.
+    IF sy-subrc <> 0.
+      MESSAGE 'MAIL GONDERÝMÝ BASARISIZ..' TYPE 'E'.
+    ELSE.
+      MESSAGE 'MAIL GONDERILDI.' TYPE 'S'.
+      DATA: lv_answer TYPE c.
+* Variable declarations
+      CALL FUNCTION 'POPUP_TO_CONFIRM'
+        EXPORTING
+          titlebar              = 'Warning'
+          text_question         = 'Kayýt etmek ister misiniz?'
+          iv_quickinfo_button_1 = 'Continue'
+        IMPORTING
+          answer                = lv_answer.
+
+
+    ENDIF.
+    IF  lv_answer EQ '1'.
+
+      DATA:w_bin_filesize TYPE i, " Binary File Size
+        w_file_name TYPE string,
+        w_file_path TYPE string,
+        w_full_path TYPE string.
+      CALL METHOD cl_gui_frontend_services=>file_save_dialog
+        CHANGING
+          filename             = w_file_name
+          path                 = w_file_path
+          fullpath             = w_full_path
+        EXCEPTIONS
+          cntl_error           = 1
+          error_no_gui         = 2
+          not_supported_by_gui = 3
+          OTHERS               = 4.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      ENDIF.
+
+
+* Use the FM GUI_DOWNLOAD to download the generated PDF file onto the
+* presentation server
+
+      CALL FUNCTION 'GUI_DOWNLOAD'
+        EXPORTING
+          bin_filesize = w_bin_filesize
+          filename     = w_full_path
+          filetype     = 'BIN'
+        TABLES
+          data_tab     = i_tline.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+      ENDIF.
+    ELSE.
+      MESSAGE 'KAYIT EDILMEDI' TYPE 'E'.
+    ENDIF.
+
+  ENDIF.
+  IF r_ucomm EQ '&BEXCEL'.
+    READ TABLE li_scarr INDEX  rs_selfield-tabindex.
+    DATA:
+      w_form_name TYPE tdsfname VALUE 'ZSPFLI_PRINT_TABLE',
+      w_fmodule TYPE rs38l_fnam,
+      w_cparam TYPE ssfctrlop,
+      w_outoptions TYPE ssfcompop.
+*      w_bin_filesize TYPE i, " Binary File Size
+*      w_file_name TYPE string,
+*      w_file_path TYPE string,
+*      w_full_path TYPE string.
+
+* Internal tables declaration
+
+* Internal table to hold the OTF data
+    DATA:
+    t_otf TYPE itcoo OCCURS 0 WITH HEADER LINE,
+
+* Internal table to hold OTF data recd from the SMARTFORM
+    t_otf_from_fm TYPE ssfcrescl,
+
+* Internal table to hold the data from the FM CONVERT_OTF
+    t_pdf_tab LIKE tline OCCURS 0 WITH HEADER LINE.
+
+
+* This function module call is used to retrieve the name of the Function
+* module generated when the SMARTFORM is activated
+
+    CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+      EXPORTING
+        formname           = w_form_name
+*       VARIANT            = ' '
+*       DIRECT_CALL        = ' '
+      IMPORTING
+        fm_name            = w_fmodule
+      EXCEPTIONS
+        no_form            = 1
+        no_function_module = 2
+        OTHERS             = 3.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+* Calling the SMARTFORM using the function module retrieved above
+* GET_OTF parameter in the CONTROL_PARAMETERS is set to get the OTF
+* format of the output
+
+
+    w_cparam-no_dialog = 'X'.
+    w_cparam-preview = space. " Suppressing the dialog box
+    " for print preview
+    w_cparam-getotf = 'X'.
+
+* Printer name to be used is provided in the export parameter
+* OUTPUT_OPTIONS
+    w_outoptions-tddest = 'LP01'.
+
+    CALL FUNCTION w_fmodule
+      EXPORTING
+*       ARCHIVE_INDEX        =
+*       ARCHIVE_INDEX_TAB    =
+*       ARCHIVE_PARAMETERS   =
+        wa_spfli             = li_scarr-carrid
+        control_parameters   = w_cparam
+*       MAIL_APPL_OBJ        =
+*       MAIL_RECIPIENT       =
+*       MAIL_SENDER          =
+        output_options       = w_outoptions
+*       USER_SETTINGS        = 'X'
+      IMPORTING
+*       DOCUMENT_OUTPUT_INFO =
+        job_output_info      = t_otf_from_fm
+*       JOB_OUTPUT_OPTIONS   =
+      EXCEPTIONS
+        formatting_error     = 1
+        internal_error       = 2
+        send_error           = 3
+        user_canceled        = 4
+        OTHERS               = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+    t_otf[] = t_otf_from_fm-otfdata[].
+
+* Function Module CONVERT_OTF is used to convert the OTF format to PDF
+
+    CALL FUNCTION 'CONVERT_OTF'
+      EXPORTING
+        format                = 'PDF'
+        max_linewidth         = 132
+*       ARCHIVE_INDEX         = ' '
+*       COPYNUMBER            = 0
+*       ASCII_BIDI_VIS2LOG    = ' '
+*       PDF_DELETE_OTFTAB     = ' '
+      IMPORTING
+        bin_filesize          = w_bin_filesize
+*       BIN_FILE              =
+      TABLES
+        otf                   = t_otf
+        lines                 = t_pdf_tab
+      EXCEPTIONS
+        err_max_linewidth     = 1
+        err_format            = 2
+        err_conv_not_possible = 3
+        err_bad_otf           = 4
+        OTHERS                = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+* To display File SAVE dialog window
+    CALL METHOD cl_gui_frontend_services=>file_save_dialog
+* EXPORTING
+* WINDOW_TITLE =
+* DEFAULT_EXTENSION =
+* DEFAULT_FILE_NAME =
+* FILE_FILTER =
+* INITIAL_DIRECTORY =
+* WITH_ENCODING =
+* PROMPT_ON_OVERWRITE = 'X'
+    CHANGING
+    filename = w_file_name
+    path = w_file_path
+    fullpath = w_full_path
+* USER_ACTION =
+* FILE_ENCODING =
+    EXCEPTIONS
+    cntl_error = 1
+    error_no_gui = 2
+    not_supported_by_gui = 3
+    OTHERS = 4
+    .
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+
+* Use the FM GUI_DOWNLOAD to download the generated PDF file onto the
+* presentation server
+
+    CALL FUNCTION 'GUI_DOWNLOAD'
+      EXPORTING
+        bin_filesize = w_bin_filesize
+        filename     = w_full_path
+        filetype     = 'BIN'
+      TABLES
+        data_tab     = t_pdf_tab.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+  ENDIF.
+
+
+  IF r_ucomm EQ '&IC1'. "double click event
+
+    READ TABLE li_scarr INDEX  rs_selfield-tabindex.
+    SELECT *
+     FROM sflight INTO CORRESPONDING FIELDS OF TABLE  lt_outtab WHERE carrid EQ li_scarr-carrid.
+    PERFORM popup_fieldcat.
+    CALL FUNCTION 'REUSE_ALV_POPUP_TO_SELECT'
+      EXPORTING
+        i_title               = 'DETAYLAR'
+        i_selection           = 'X'
+        i_zebra               = 'x '
+        i_screen_start_column = 0
+        i_screen_start_line   = 0
+        i_screen_end_column   = 0
+        i_screen_end_line     = 0
+        i_scroll_to_sel_line  = 'X'
+        i_tabname             = 'LT_OUTTAB'
+        i_structure_name      = 'SFLIGHT'
+        it_fieldcat           = fieldcat[]
+      IMPORTING
+        es_selfield           = rs_selfield
+        e_exit                = lv_exit
+      TABLES
+        t_outtab              = lt_outtab
+      EXCEPTIONS
+        program_error         = 1
+        OTHERS                = 2.
+
+    READ TABLE lt_outtab index rs_selfield-tabindex.
+   " BREAK-POINT.
+  ENDIF.
+
+
+
+  IF r_ucomm EQ '&BUT'.
+
+    READ TABLE li_scarr INDEX  rs_selfield-tabindex.
+   " BREAK-POINT.
+    CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+      EXPORTING
+        formname           = 'ZSPFLI_PRINT_TABLE'
+*       VARIANT            = ' '
+*       DIRECT_CALL        = ' '
+      IMPORTING
+        fm_name            = v_form_name
+      EXCEPTIONS
+        no_form            = 1
+        no_function_module = 2
+        OTHERS             = 3.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+    "sost
+
+    CALL FUNCTION v_form_name
+      EXPORTING
+        wa_spfli         = li_scarr-carrid
+      EXCEPTIONS
+        formatting_error = 1
+        internal_error   = 2
+        send_error       = 3
+        user_canceled    = 4
+        OTHERS           = 5.
+    "  BREAK-POINT.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+
+  ENDIF.
+  IF r_ucomm EQ '&BPDF'.
+
+    CALL FUNCTION 'WS_DOWNLOAD'
+      EXPORTING
+        filename = 'C:\deneme\Deneme.xls'
+        filetype = 'DAT'
+      TABLES
+        data_tab = li_scarr.
+    IF sy-subrc <> 0.
+
+    ENDIF.
+
+    MESSAGE 'EXCEL BUTONA BASILDI' TYPE 'S'.
+
+  ENDIF.
+ENDFORM.  "User_command
+
+
+*&---------------------------------------------------------------------*
+*&      Form  display_alv
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM display_alv.
+  SELECT *
+         FROM scarr
+         INTO CORRESPONDING FIELDS OF TABLE li_scarr
+         WHERE carrid IN s_carrid.
+  " BREAK-POINT.
+ENDFORM.                    "display_alv
+
+
+*&---------------------------------------------------------------------*
+*&      Form  fieldcat
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM fieldcat.
+  wa_fieldcat-col_pos = '1'.
+  wa_fieldcat-row_pos = '1'.
+  "wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'lv_chk'.
+  wa_fieldcat-seltext_m = 'chk'.
+  wa_fieldcat-no_out = 'X'.
+  wa_fieldcat-checkbox = 'X'.
+  wa_fieldcat-edit = 'X'.
+  wa_fieldcat-input = 'X'.
+
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '2'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'CARRID'.
+  wa_fieldcat-seltext_m = 'ID'.
+  wa_fieldcat-HOTSPOT = 'X' .
+
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '3'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'CARRNAME'.
+  wa_fieldcat-seltext_m = 'CARRNAME'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '4'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'CURRCODE'.
+  wa_fieldcat-seltext_m = 'CURRCODE'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '5'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'URL'.
+  wa_fieldcat-seltext_m = 'URL'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+ENDFORM.                    "FIELDC
+
+
+*&---------------------------------------------------------------------*
+*&      Form  popup_fieldcat
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM popup_fieldcat.
+
+  fieldcat-tabname = 'LT_OUTTAB'.
+  fieldcat-fieldname = 'CARRID'.
+  fieldcat-seltext_m = 'Havayolu'.
+  fieldcat-HOTSPOT = 'X' .
+  fieldcat-ddictxt = 'M'.
+  fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'LT_OUTTAB'.
+  fieldcat-fieldname = 'CONNID'.
+  fieldcat-seltext_m = 'Flight Connect'.
+  fieldcat-ddictxt = 'S'.
+*  fieldcat-seltext_s = 'S'.
+*  fieldcat-outputlen = 1.
+*  fieldcat-fix_column = 1.
+  fieldcat-outputlen = 6.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'LT_OUTTAB'.
+  fieldcat-fieldname = 'FLDATE'.
+  fieldcat-seltext_m = 'Flight date'.
+  fieldcat-ddictxt = 'M'.
+ " fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'LT_OUTTAB'.
+  fieldcat-fieldname = 'PRICE'.
+  fieldcat-seltext_m = 'Airfare'.
+  fieldcat-ddictxt = 'M'.
+
+  "fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'LT_OUTTAB'.
+  fieldcat-fieldname = 'CURRENCY'.
+  fieldcat-seltext_m = 'Local currency of airline'.
+  fieldcat-ddictxt = 'M'.
+  "fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'LT_OUTTAB'.
+  fieldcat-fieldname = 'PLANETYPE'.
+  fieldcat-seltext_m = 'Aircraft Type'.
+  fieldcat-ddictxt = 'M'.
+  "fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'LT_OUTTAB'.
+  fieldcat-fieldname = 'SEATSMAX'.
+  fieldcat-seltext_m = 'Maximum capacity in economy class'.
+  fieldcat-ddictxt = 'M'.
+  "fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'LT_OUTTAB'.
+  fieldcat-fieldname = 'SEATSOCC'.
+  fieldcat-seltext_m = 'Occupied seats in economy class'.
+  fieldcat-ddictxt = 'M'.
+
+ " fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+**  DATA : i_sort TYPE slis_t_sortinfo_alv .
+**  DATA : wa_sort LIKE LINE OF i_sort .
+**  wa_sort-fieldname = 'SCARR '.
+**  wa_sort-up = 'X'.
+**  wa_sort-subtot = 'X '.
+**  APPEND wa_sort TO i_sort .
+ENDFORM.                    "popup_fieldcat

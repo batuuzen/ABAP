@@ -1,0 +1,40 @@
+FUNCTION Z_SAYININ_USSUNU_AL.
+*"-------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(IV_SAYI) TYPE  I
+*"     REFERENCE(IV_US) TYPE  I
+*"  EXPORTING
+*"     REFERENCE(EV_SONUC) TYPE  I
+*"  EXCEPTIONS
+*"      SONUC_HESAPLANAMADI
+*"-------------------------------------------------------------------
+
+  DATA lv_us type i.
+
+  TRY.
+
+      IF iv_us <= 0.
+
+        ev_sonuc = 0.
+        RAISE sonuc_hesaplanamadi.
+
+      ELSEIF iv_us = 1.
+
+        ev_sonuc = iv_sayi.
+
+      ELSE.
+        ev_sonuc = iv_sayi * iv_sayi.
+        lv_us    = iv_us - 1.
+
+        WHILE sy-index < lv_us .
+          ev_sonuc =  ev_sonuc * iv_sayi.
+        ENDWHILE.
+      ENDIF.
+    CATCH cx_sy_arithmetic_overflow.
+      ev_sonuc = 0.
+      RAISE sonuc_hesaplanamadi.
+  ENDTRY.
+
+
+ENDFUNCTION.

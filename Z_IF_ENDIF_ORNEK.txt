@@ -1,0 +1,25 @@
+*&-------------------------------------------------------------------
+*& Report  Z_IF_ENDIF_ORNEK
+*&
+*&-------------------------------------------------------------------
+*&
+*&
+*&-------------------------------------------------------------------
+
+REPORT  Z_IF_ENDIF_ORNEK.
+
+data gv_zaman type t.
+
+gv_zaman = sy-uzeit.
+
+if gv_zaman <= '120000'.
+
+  write / 'Ogleden Once'.
+
+elseif gv_zaman >  '120000' and
+       gv_zaman <=   '180000'.
+
+  write / 'Ogleden Sonra'.
+else.
+  write / 'Aksam'.
+endif.

@@ -1,0 +1,447 @@
+REPORT  zalv_popdialog_SCARR_SPFLI.
+
+TABLES: scarr,spfli.
+
+
+DATA: li_scarr          TYPE  TABLE OF scarr      WITH HEADER LINE         ,
+      li_spfli          TYPE TABLE OF spfli                  WITH HEADER LINE,
+      it_fieldcat       TYPE          slis_t_fieldcat_alv,
+      wa_fieldcat       TYPE          slis_fieldcat_alv,
+      fieldcat          TYPE          slis_t_fieldcat_alv    WITH HEADER LINE,
+      fieldcat1          TYPE          slis_t_fieldcat_alv    WITH HEADER LINE,
+      li_sflight        TYPE TABLE OF       sflight                WITH HEADER LINE.
+
+DATA : i_sort TYPE slis_t_sortinfo_alv .
+DATA : wa_sort LIKE LINE OF i_sort .
+
+START-OF-SELECTION.
+  SELECT-OPTIONS s_carrid FOR scarr-carrid.
+
+END-OF-SELECTION.
+
+  PERFORM display_alv.
+  PERFORM fieldcat.
+  PERFORM popup_fieldcat.
+  PERFORM popup_fieldcat1.
+  PERFORM calc_subtot .
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program       = sy-repid
+      i_callback_pf_status_set = 'SUB_PF_STATUS'
+      i_callback_user_command  = 'USER_COMMAND1'
+      it_fieldcat              = it_fieldcat
+    TABLES
+      t_outtab                 = li_scarr
+    EXCEPTIONS
+      program_error            = 1
+      OTHERS                   = 2.
+  IF sy-subrc NE 0.
+    MESSAGE 'Error in displaying output.' TYPE 'E'.
+  ENDIF.
+
+
+
+*&---------------------------------------------------------------------*
+*&      Form  sub_pf_status
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->RT_EXTAB   text
+*----------------------------------------------------------------------*
+FORM sub_pf_status USING rt_extab TYPE slis_t_extab..
+  SET PF-STATUS 'ZSTATUS'.
+ENDFORM.                    "sub_pf_status
+
+*&---------------------------------------------------------------------*
+*&      Form  user_command
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->R_UCOMM      text
+*      -->RS_SELFIELD  text
+*----------------------------------------------------------------------*
+FORM user_command1 USING r_ucomm    LIKE sy-ucomm
+                     rs_selfield TYPE slis_selfield.
+  " CASE r_ucomm.
+  "  WHEN  '&IC1'.
+
+  READ TABLE li_scarr INDEX rs_selfield-tabindex.
+
+  PERFORM alv1.
+
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program       = sy-repid
+      i_callback_pf_status_set = 'SUB_PF_STATUS'
+      i_callback_user_command  = 'USER_COMMAND2'
+      i_structure_name         = 'spfli'
+      it_fieldcat              = fieldcat[]
+      i_screen_start_column    = 10
+      i_screen_start_line      = 20
+      i_screen_end_column      = 120
+      i_screen_end_line        = 40
+    TABLES
+      t_outtab                 = li_spfli
+    EXCEPTIONS
+      program_error            = 1
+      OTHERS                   = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+
+
+  "ENDCASE.
+
+ENDFORM.                    "user_command
+
+*&---------------------------------------------------------------------*
+*&      Form  display_alv
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+
+FORM user_command2 USING r_ucomm    LIKE sy-ucomm
+                     rs_selfield TYPE slis_selfield.
+  READ TABLE li_spfli INDEX rs_selfield-tabindex.
+
+  PERFORM alv2.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program       = sy-repid
+      i_callback_pf_status_set = 'SUB_PF_STATUS'
+                    "  i_callback_user_command  = 'USER_COMMAND2'
+      i_structure_name         = 'sflight'
+      it_fieldcat              = fieldcat1[]
+      it_sort                  = i_sort
+      i_screen_start_column    = 10
+      i_screen_start_line      = 20
+      i_screen_end_column      = 120
+      i_screen_end_line        = 40
+    TABLES
+      t_outtab                 = li_sflight
+    EXCEPTIONS
+      program_error            = 1
+      OTHERS                   = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+ENDFORM.                    "user_command2
+*&---------------------------------------------------------------------*
+*&      Form  alv1
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM alv1.
+  SELECT * FROM spfli
+      INTO CORRESPONDING FIELDS OF TABLE li_spfli
+      WHERE carrid EQ li_scarr-carrid.
+ENDFORM.                    "alv1
+*&---------------------------------------------------------------------*
+*&      Form  display_alv
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM display_alv.
+  SELECT *
+         FROM scarr
+         INTO CORRESPONDING FIELDS OF TABLE li_scarr
+         WHERE carrid IN s_carrid.
+  " BREAK-POINT.
+ENDFORM.                    "display_alv
+
+*&---------------------------------------------------------------------*
+*&      Form  fieldcat
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+
+FORM alv2.
+  SELECT * FROM sflight
+        INTO CORRESPONDING FIELDS OF TABLE li_sflight
+        WHERE carrid EQ li_scarr-carrid AND connid EQ li_spfli-connid.
+ENDFORM.                    "alv2
+*&---------------------------------------------------------------------*
+*&      Form  fieldcat
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM fieldcat.
+  wa_fieldcat-col_pos = '1'.
+  wa_fieldcat-row_pos = '1'.
+  "wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'lv_chk'.
+  wa_fieldcat-seltext_m = 'chk'.
+  wa_fieldcat-no_out = 'X'.
+  "wa_fieldcat-checkbox = 'X'.
+  wa_fieldcat-edit = 'X'.
+  "wa_fieldcat-input = 'X'.
+
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '2'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'CARRID'.
+  wa_fieldcat-seltext_m = 'ID'.
+  wa_fieldcat-hotspot = 'X' .
+
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '3'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'CARRNAME'.
+  wa_fieldcat-seltext_m = 'CARRNAME'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '4'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'CURRCODE'.
+  wa_fieldcat-seltext_m = 'CURRCODE'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '5'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'URL'.
+  wa_fieldcat-seltext_m = 'URL'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+ENDFORM.                    "fieldcat
+
+*&---------------------------------------------------------------------*
+*&      Form  popup_fieldcat
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM popup_fieldcat.
+
+  fieldcat-col_pos = '1'.
+  fieldcat-row_pos = '1'.
+  "wa_fieldcat-tabname = 'SCARR'.
+  fieldcat-fieldname = 'lv_chk'.
+  fieldcat-seltext_m = 'chk'.
+  fieldcat-no_out = 'X'.
+  fieldcat-checkbox = 'X'.
+  fieldcat-edit = 'X'.
+  fieldcat-input = 'X'.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'li_spfli'.
+  fieldcat-fieldname = 'CARRID'.
+  fieldcat-seltext_m = 'Havayolu'.
+  fieldcat-hotspot = 'X' .
+  fieldcat-ddictxt = 'M'.
+  fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'li_spfli'.
+  fieldcat-fieldname = 'CONNID'.
+  fieldcat-seltext_m = 'Flight Connect'.
+  fieldcat-ddictxt = 'S'.
+*  fieldcat-seltext_s = 'S'.
+*  fieldcat-outputlen = 1.
+*  fieldcat-fix_column = 1.
+  fieldcat-outputlen = 6.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'li_spfli'.
+  fieldcat-fieldname = 'COUNTRYFR'.
+  fieldcat-seltext_m = 'COUNTRYFR'.
+  fieldcat-ddictxt = 'M'.
+  " fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'li_spfli'.
+  fieldcat-fieldname = 'CITYFROM'.
+  fieldcat-seltext_m = 'CITYFROM'.
+  fieldcat-ddictxt = 'M'.
+
+  "fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'li_spfli'.
+  fieldcat-fieldname = 'AIRPFROM'.
+  fieldcat-seltext_m = 'AIRPFROM'.
+  fieldcat-ddictxt = 'M'.
+  "fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'li_spfli'.
+  fieldcat-fieldname = 'COUNTRYTO'.
+  fieldcat-seltext_m = 'COUNTRYTO'.
+  fieldcat-ddictxt = 'M'.
+  "fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'li_spfli'.
+  fieldcat-fieldname = 'CITYTO'.
+  fieldcat-seltext_m = 'CITYTO'.
+  fieldcat-ddictxt = 'M'.
+  "fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+  fieldcat-tabname = 'li_spfli'.
+  fieldcat-fieldname = 'AIRPTO'.
+  fieldcat-seltext_m = 'AIRPTO'.
+  fieldcat-ddictxt = 'M'.
+
+  " fieldcat-outputlen = 10.
+  APPEND fieldcat.
+  CLEAR fieldcat.
+
+ENDFORM.                    "popup_fieldcat
+*&---------------------------------------------------------------------*
+*&      Form  popup_fieldcat1
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM popup_fieldcat1.
+  fieldcat1-tabname = 'li_sflight'.
+  fieldcat1-fieldname = 'CARRID'.
+  fieldcat1-seltext_m = 'Havayolu'.
+  fieldcat1-ddictxt = 'M'.
+  fieldcat1-outputlen = 10.
+  APPEND fieldcat1.
+  CLEAR fieldcat1.
+
+
+  fieldcat1-tabname = 'li_sflight'.
+  fieldcat1-fieldname = 'CONNID'.
+  fieldcat1-seltext_m = 'CONNID'.
+  fieldcat1-ddictxt = 'M'.
+  fieldcat1-outputlen = 10.
+  APPEND fieldcat1.
+  CLEAR fieldcat1.
+
+  fieldcat1-tabname = 'li_sflight'.
+  fieldcat1-fieldname = 'FLDATE'.
+  fieldcat1-seltext_m = 'FLDATE'.
+  fieldcat1-ddictxt = 'M'.
+  fieldcat1-outputlen = 10.
+  APPEND fieldcat1.
+  CLEAR fieldcat1.
+
+  fieldcat1-tabname = 'li_sflight'.
+  fieldcat1-fieldname = 'PRICE'.
+  fieldcat1-seltext_m = 'PRICE'.
+  fieldcat1-ddictxt = 'M'.
+  fieldcat1-outputlen = 10.
+  fieldcat1-do_sum = 'X' .
+  fieldcat1-emphasize = 'C610'.
+  APPEND fieldcat1.
+  CLEAR fieldcat1.
+
+  "fieldcat1-col_pos = 5.
+  " fieldcat1-fieldname = 'PRICE' .
+  " fieldcat1-tabname = 'li_sflight' .
+  " fieldcat1-seltext_m = 'NETPRICE' .
+  "fieldcat1-emphasize = 'C610'.
+  "fieldcat1-do_sum = 'X' .
+  "APPEND fieldcat1.
+  "CLEAR fieldcat1.
+
+  fieldcat1-tabname = 'li_sflight'.
+  fieldcat1-fieldname = 'CURRENCY'.
+  fieldcat1-seltext_m = 'CURRENCY'.
+  fieldcat1-ddictxt = 'M'.
+  fieldcat1-outputlen = 10.
+  APPEND fieldcat1.
+  CLEAR fieldcat1.
+
+  fieldcat1-tabname = 'li_sflight'.
+  fieldcat1-fieldname = 'PLANETYPE'.
+  fieldcat1-seltext_m = 'PLANETYPE'.
+  fieldcat1-ddictxt = 'M'.
+  fieldcat1-outputlen = 10.
+  APPEND fieldcat1.
+  CLEAR fieldcat1.
+
+  fieldcat1-tabname = 'li_sflight'.
+  fieldcat1-fieldname = 'SEATSMAX'.
+  fieldcat1-seltext_m = 'SEATSMAX'.
+  fieldcat1-ddictxt = 'M'.
+  fieldcat1-outputlen = 10.
+  APPEND fieldcat1.
+  CLEAR fieldcat1.
+
+  fieldcat1-tabname = 'li_sflight'.
+  fieldcat1-fieldname = 'SEATSOCC'.
+  fieldcat1-seltext_m = 'SEATSOCC'.
+  fieldcat1-ddictxt = 'M'.
+  fieldcat1-outputlen = 10.
+  APPEND fieldcat1.
+  CLEAR fieldcat1.
+
+
+ENDFORM.                    "popup_fieldcat1
+
+*&---------------------------------------------------------------------*
+*&      Form  CALC_SUBTOT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM calc_subtot .
+  wa_sort-fieldname = 'PRICE'.
+  wa_sort-up = 'X'.
+  wa_sort-subtot = 'X '.
+  APPEND wa_sort TO i_sort .
+ENDFORM.                    " CALC_SUBTOT
+
+
+*  READ TABLE li_scarr INDEX rs_selfield-tabindex.
+*
+*  SELECT * FROM spfli
+*    INTO CORRESPONDING FIELDS OF TABLE li_spfli
+*    WHERE carrid EQ li_scarr-carrid.
+*  PERFORM popup_fieldcat.
+*  CALL FUNCTION 'REUSE_ALV_POPUP_TO_SELECT'
+*    EXPORTING
+*     i_title                       = 'SPFLI'
+*     i_selection                   = 'X'
+*   "  I_ALLOW_NO_SELECTION          =
+*     i_zebra                       = 'x '
+*     i_screen_start_column    = 10
+*      i_screen_start_line      = 20
+*      i_screen_end_column      = 100
+*      i_screen_end_line        = 40
+*   "  I_CHECKBOX_FIELDNAME          =
+*   "  I_LINEMARK_FIELDNAME          =
+*     i_scroll_to_sel_line          = 'X'
+*      i_tabname                     = 'li_spfli'
+*     i_structure_name              = 'spfli'
+*     it_fieldcat                   =  fieldcat[]
+**       IT_EXCLUDING                  =
+**       I_CALLBACK_PROGRAM            =
+**       I_CALLBACK_USER_COMMAND       =
+**       IS_PRIVATE                    =
+**     IMPORTING
+**       ES_SELFIELD                   =
+**       E_EXIT                        =
+*    TABLES
+*      t_outtab                      = li_spfli
+*   EXCEPTIONS
+*     program_error                 = 1
+*     OTHERS                        = 2
+*            .
+*  IF sy-subrc <> 0.
+** Implement suitable error handling here
+*  ENDIF.

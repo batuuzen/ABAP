@@ -1,0 +1,16 @@
+*&-------------------------------------------------------------------
+*& Report  Z_DO_ENDDO_ORNEK
+*&
+*&-------------------------------------------------------------------
+*&
+*&
+*&-------------------------------------------------------------------
+
+REPORT  Z_DO_ENDDO_ORNEK.
+
+DATA gv_sayinin_karesi TYPE i.
+
+DO 5 TIMES.
+  gv_sayinin_karesi = sy-index ** 2.
+  WRITE:/ sy-index, gv_sayinin_karesi.
+ENDDO.

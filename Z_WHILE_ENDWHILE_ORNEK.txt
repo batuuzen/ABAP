@@ -1,0 +1,16 @@
+*&-------------------------------------------------------------------
+*& Report  Z_WHILE_ENDWHILE_ORNEK
+*&
+*&-------------------------------------------------------------------
+*&
+*&
+*&-------------------------------------------------------------------
+
+REPORT  z_while_endwhile_ornek.
+
+DATA gv_sayinin_karesi TYPE i.
+
+WHILE gv_sayinin_karesi < 100.
+  gv_sayinin_karesi = sy-index ** 2.
+  WRITE:/ sy-index, gv_sayinin_karesi.
+ENDWHILE.

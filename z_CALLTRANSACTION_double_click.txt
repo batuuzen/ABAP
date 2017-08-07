@@ -1,0 +1,72 @@
+REPORT  Z_ALV_INTERACTIVE_RAPOR.
+TYPE-POOLS SLIS .
+TYPES : BEGIN OF TY_MARA,  "User defined internal table type
+        MATNR TYPE MARA-MATNR,
+        MTART TYPE MARA-MTART,
+        MBRSH TYPE MARA-MBRSH,
+        MEINS TYPE MARA-ERNAM,
+      END OF TY_MARA.
+
+DATA : IT_MARA TYPE TABLE OF TY_MARA ."internal table
+DATA : WA_MARA TYPE TY_MARA . "work area
+
+DATA : IT_FCAT TYPE SLIS_T_FIELDCAT_ALV . "field catalog table
+DATA : WA_FCAT LIKE LINE OF IT_FCAT . "field catalog work area
+PARAMETERS : P_MTART TYPE MARA-MTART. "material type input
+
+START-OF-SELECTION.
+**get table data
+  SELECT MATNR MTART MBRSH ERNAM FROM MARA "get data from MARA
+      INTO TABLE IT_MARA UP TO 50 ROWS
+      WHERE MTART = P_MTART.
+*** generate field catalogue
+  WA_FCAT-COL_POS = '1' . "column position
+  WA_FCAT-FIELDNAME = 'MATNR' . "column name
+  WA_FCAT-TABNAME = 'IT_MARA' . "table
+  WA_FCAT-SELTEXT_M = 'Material' . "Column label
+  WA_FCAT-KEY = 'X' . "is a key field
+  WA_FCAT-HOTSPOT = 'X' . "Set hotspot for matnr
+  APPEND WA_FCAT TO IT_FCAT . "append to fcat
+  CLEAR WA_FCAT .
+  WA_FCAT-COL_POS = '2' .
+  WA_FCAT-FIELDNAME = 'MBRSH' .
+  WA_FCAT-TABNAME = 'IT_MARA' .
+  WA_FCAT-SELTEXT_M = 'Industry Sec' .
+  APPEND WA_FCAT TO IT_FCAT .
+  CLEAR WA_FCAT .
+
+  WA_FCAT-COL_POS = '3' .
+  WA_FCAT-FIELDNAME = 'MTART' .
+  WA_FCAT-TABNAME = 'IT_MARA' .
+  WA_FCAT-SELTEXT_M = 'Material Type' .
+  APPEND WA_FCAT TO IT_FCAT .
+  CLEAR WA_FCAT .
+
+  WA_FCAT-COL_POS = '4' .
+  WA_FCAT-FIELDNAME = 'ERNAM' .
+  WA_FCAT-TABNAME = 'IT_MARA' .
+  WA_FCAT-SELTEXT_M = 'Base.Unit' .
+  WA_FCAT-REF_TABNAME = 'MARA' .
+  APPEND WA_FCAT TO IT_FCAT .
+  CLEAR WA_FCAT .
+**display ALV
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      I_CALLBACK_PROGRAM      = SY-REPID
+      I_CALLBACK_USER_COMMAND = 'USER_COMMAND' "user command form
+      IT_FIELDCAT             = IT_FCAT "PASS FIELD CATALOG TO ALV
+    TABLES
+      T_OUTTAB                = IT_MARA. "output table
+
+**for to handle user command
+FORM USER_COMMAND USING R_UCOMM LIKE SY-UCOMM
+                        RS_SELFIELD TYPE SLIS_SELFIELD.
+  CASE R_UCOMM.
+    WHEN '&IC1'. "standard Function code for doubel click
+      READ TABLE IT_MARA INTO WA_MARA INDEX RS_SELFIELD-TABINDEX.
+      IF SY-SUBRC = 0.
+        SET PARAMETER ID 'MAT' FIELD WA_MARA-MATNR. "set parameter id
+        CALL TRANSACTION 'MM03' AND SKIP FIRST SCREEN. "call transaction
+      ENDIF.
+  ENDCASE.
+ENDFORM.

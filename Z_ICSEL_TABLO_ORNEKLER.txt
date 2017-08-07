@@ -1,0 +1,53 @@
+*&---------------------------------------------------------------------*
+*& Report  Z_ICSEL_TABLO_ORNEKLER
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT  Z_ICSEL_TABLO_ORNEKLER.
+
+
+TYPES : BEGIN OF gty_s_futbol_takimi,
+         takim_ismi TYPE string,
+          puan       TYPE i,
+          sira       TYPE i,
+       END OF gty_s_futbol_takimi,
+
+       gty_t_futbol_takimi TYPE STANDARD TABLE OF gty_s_futbol_takimi WITH DEFAULT KEY.
+
+DATA : gt_futbol_takimi_listesi TYPE gty_t_futbol_takimi,
+       gs_futbol_takimi         TYPE gty_s_futbol_takimi.
+
+
+gs_futbol_takimi-takim_ismi = 'Fenerbahce'.
+gs_futbol_takimi-puan       = 76.
+gs_futbol_takimi-sira       = 1.
+APPEND gs_futbol_takimi TO gt_futbol_takimi_listesi.
+
+
+gs_futbol_takimi-takim_ismi = 'Galatasaray'.
+gs_futbol_takimi-puan       = 56.
+gs_futbol_takimi-sira       = 4.
+APPEND gs_futbol_takimi TO gt_futbol_takimi_listesi.
+
+
+
+gs_futbol_takimi-takim_ismi = 'Bursaspor'.
+gs_futbol_takimi-puan       = 65.
+gs_futbol_takimi-sira       = 3.
+APPEND gs_futbol_takimi TO gt_futbol_takimi_listesi.
+
+
+
+gs_futbol_takimi-takim_ismi = 'Kayserispor'.
+gs_futbol_takimi-puan       = 69.
+gs_futbol_takimi-sira       = 2.
+APPEND gs_futbol_takimi TO gt_futbol_takimi_listesi.
+
+LOOP AT gt_futbol_takimi_listesi INTO gs_futbol_takimi.
+  WRITE:/ gs_futbol_takimi-sira,
+          gs_futbol_takimi-takim_ismi,
+          gs_futbol_takimi-puan.
+ENDLOOP.

@@ -1,0 +1,146 @@
+REPORT  z_alv_color.
+
+TABLES:
+  spfli,
+  sflight,
+  sbook.
+
+TYPE-POOLS:
+  slis.
+
+DATA:
+  BEGIN OF t_spfli OCCURS 0 ,
+    checkbox,
+    color(3).
+        INCLUDE STRUCTURE spfli.
+DATA:  END OF t_spfli.
+
+DATA:
+  t_sspfli LIKE STANDARD TABLE OF t_spfli .
+
+DATA:
+  fs_spfli LIKE LINE OF t_sspfli.
+
+DATA:
+  BEGIN OF t_sflight OCCURS 0,
+    checkbox,
+    color(3).
+        INCLUDE STRUCTURE sflight.
+DATA:  END OF t_sflight.
+
+DATA:
+  t_ssflight LIKE STANDARD TABLE OF t_sflight.
+
+DATA:
+  fs_sflight LIKE LINE OF t_ssflight.
+
+*DATA:
+*  BEGIN OF t_sbook OCCURS 0.
+*        INCLUDE STRUCTURE sbook.
+*DATA:  END OF t_sbook.
+
+DATA:
+  fs_layout TYPE  slis_layout_alv,
+  w_program TYPE sy-repid.
+
+SELECT *
+  FROM spfli
+  INTO CORRESPONDING FIELDS OF TABLE t_spfli.
+
+fs_layout-info_fieldname = 'COLOR'.
+fs_layout-box_fieldname = 'CHECKBOX'.
+
+w_program = sy-repid.
+
+CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+  EXPORTING
+    i_callback_program       = w_program
+    i_callback_pf_status_set = 'FLIGHT'
+    i_callback_user_command  = 'SPFLI_INFO'
+    i_structure_name         = 'SPFLI'
+    is_layout                = fs_layout
+  TABLES
+    t_outtab                 = t_spfli
+  EXCEPTIONS
+    program_error            = 1
+    OTHERS                   = 2.
+IF sy-subrc <> 0.
+* MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*         WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+ENDIF.
+
+*&--------------------------------------------------------------------*
+*&      Form  FLIGHT
+*&--------------------------------------------------------------------*
+*       text
+*---------------------------------------------------------------------*
+*      -->RT_EXTAB   text
+*---------------------------------------------------------------------*
+
+FORM flight    USING rt_extab TYPE slis_t_extab..
+  SET PF-STATUS 'ZSTANDARD1' EXCLUDING rt_extab.
+ENDFORM.                    "FLIGHT
+
+*&--------------------------------------------------------------------*
+*&      Form  SPFLI_INFO
+*&--------------------------------------------------------------------*
+*       text
+*---------------------------------------------------------------------*
+*      -->UCOMM      text
+*      -->SELFIELD   text
+*---------------------------------------------------------------------*
+FORM spfli_info USING ucomm LIKE sy-ucomm
+                       selfield TYPE slis_selfield.
+
+  selfield-refresh = 'X'.
+  CASE ucomm.
+    WHEN '&FLIGHT'.
+      LOOP AT t_spfli.
+        IF t_spfli-checkbox = 'X'.
+          t_spfli-checkbox = ' '.
+          t_spfli-color = 'C51'.
+          MODIFY t_spfli TRANSPORTING checkbox color.
+          fs_spfli = t_spfli.
+          APPEND fs_spfli TO t_sspfli.
+        "  BREAK-POINT.
+        ENDIF.
+      ENDLOOP.
+
+      LOOP AT t_sspfli into fs_spfli.
+        SELECT *
+          FROM sflight
+     APPENDING CORRESPONDING FIELDS OF TABLE t_sflight
+         WHERE carrid EQ fs_spfli-carrid
+        AND connid EQ fs_spfli-connid.
+      ENDLOOP.
+
+  ENDCASE.
+  REFRESH t_sspfli.
+ " CLEAR fs_spfli.
+
+ " fs_layout-info_fieldname = 'COLOR'.
+ " fs_layout-confirmation_prompt = 'X'.
+ " fs_layout-key_hotspot = 'X'.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program = w_program
+      i_callback_pf_status_set = 'FLIGHT'
+      i_structure_name   = 'SFLIGHT'
+       i_screen_start_column    = 10
+      i_screen_start_line      = 20
+      i_screen_end_column      = 120
+      i_screen_end_line        = 40
+      is_layout          = fs_layout
+    TABLES
+      t_outtab           = t_sflight
+    EXCEPTIONS
+      program_error      = 1
+      OTHERS             = 2.
+  IF sy-subrc <> 0.
+* MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*         WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+  REFRESH t_sflight.
+
+ENDFORM.                    "SPFLI_INFO

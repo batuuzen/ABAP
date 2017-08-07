@@ -1,0 +1,231 @@
+TYPE-POOLS slis .
+TYPES : BEGIN OF ty_mara,  "User defined internal table type
+        matnr TYPE mara-matnr,
+        mtart TYPE mara-mtart,
+        mbrsh TYPE mara-mbrsh,
+        meins TYPE mara-meins,
+      END OF ty_mara.
+
+DATA : it_mara TYPE TABLE OF ty_mara ."internal table
+DATA : wa_mara TYPE ty_mara . "work area
+
+DATA : it_fcat TYPE slis_t_fieldcat_alv . "field catalog table
+DATA : wa_fcat LIKE LINE OF it_fcat . "field catalog work area
+TYPES: BEGIN OF ty_tsp01,
+      rqident   TYPE tsp01-rqident,           " spool number
+      rq2name TYPE tsp01-rq2name,           " Spool request: Suffix 2
+      rqcretime TYPE tsp01-rqcretime,         " User name
+      END OF ty_tsp01.
+DATA: lv_jobcnt TYPE tbtcjob-jobcount,         " job number
+      lv_jobname TYPE tbtcjob-jobname.         " job name
+DATA: lv_len TYPE i,
+    ls_param TYPE rsparams,                  " selection work area
+    ls_tsp01 TYPE ty_tsp01,                  " Spool Requests work area
+    lt_tsp01 TYPE STANDARD TABLE OF ty_tsp01, " Spool Requests internal table
+    lt_param TYPE rsparams_tt.                " Selection table
+DATA:  lv_rq2name TYPE tsp01-rq2name.           " Spool request
+DATA: lv_tmp(14) TYPE c,                       " temp
+    lv_string TYPE string,                   " store program name
+    lv_temp TYPE tsp01-rq2name,              " Spool request
+    lv_spool TYPE tsp01-rqident.             " spool number
+DATA: lv_job    TYPE tbtcv-fin.                " Job status
+DATA : lv_rqdest TYPE tsp01-rqdest VALUE 'LP01',
+      lv_linsz TYPE sylinsz VALUE '9999999'.
+*selection Screen
+PARAMETERS : p_mtart TYPE mara-mtart. "material type input
+
+START-OF-SELECTION.
+**get table data
+  SELECT matnr mtart mbrsh meins FROM mara
+      INTO TABLE it_mara UP TO 50 ROWS
+      WHERE mtart = p_mtart.
+*** generate field catalogue
+  wa_fcat-col_pos = '1' . "column position
+  wa_fcat-fieldname = 'MATNR' . "column name
+  wa_fcat-tabname = 'IT_MARA' . "table
+  wa_fcat-seltext_m = 'Material' . "Column lable
+  wa_fcat-key = 'X' . "is a key field
+  APPEND wa_fcat TO it_fcat . "append to fcat
+  CLEAR wa_fcat .
+  wa_fcat-col_pos = '2' .
+  wa_fcat-fieldname = 'MBRSH' .
+  wa_fcat-tabname = 'IT_MARA' .
+  wa_fcat-seltext_m = 'Industry Sec' .
+  APPEND wa_fcat TO it_fcat .
+  CLEAR wa_fcat .
+
+  wa_fcat-col_pos = '3' .
+  wa_fcat-fieldname = 'MTART' .
+  wa_fcat-tabname = 'IT_MARA' .
+  wa_fcat-seltext_m = 'Material Type' .
+  APPEND wa_fcat TO it_fcat .
+  CLEAR wa_fcat .
+
+  wa_fcat-col_pos = '4' .
+  wa_fcat-fieldname = 'MEINS' .
+  wa_fcat-tabname = 'IT_MARA' .
+  wa_fcat-seltext_m = 'Base.Unit' .
+  wa_fcat-ref_tabname = 'MARA' .
+  APPEND wa_fcat TO it_fcat .
+  CLEAR wa_fcat .
+**display ALV
+  DATA: alv_print TYPE slis_print_alv.
+  alv_print-no_print_listinfos = 'X'. "avoid process list on SPOOL
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program       = sy-repid
+      i_callback_pf_status_set = 'FORM_MENU' "GU status form
+      i_callback_user_command  = 'USER_COMMAND'
+      it_fieldcat              = it_fcat "PASS FIELD CATALOG TO ALV
+      is_print                 = alv_print "to set spool options
+    TABLES
+      t_outtab                 = it_mara.
+
+*&---------------------------------------------------------------------*
+*&      Form  FORM_MENU
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->RT_EXTAB   text
+*----------------------------------------------------------------------*
+FORM form_menu USING rt_extab TYPE slis_t_extab.
+*SET PF STATUS to ALV
+  SET PF-STATUS 'MENU'. "GUI status...double click to create
+ENDFORM.                               " SET_PF_STATUS
+
+**for to handle user command
+FORM user_command USING r_ucomm LIKE sy-ucomm
+                        rs_selfield TYPE slis_selfield.
+  CASE r_ucomm.
+    WHEN '&EPDF'. "Function code for export which we created in MENU
+**submit the same program in background and store
+
+* ********* Derive job counter
+      lv_jobname = 'ZALV2PDF'. "Background job name
+      CALL FUNCTION 'JOB_OPEN' "open a job
+        EXPORTING
+          jobname          = lv_jobname
+        IMPORTING
+          jobcount         = lv_jobcnt
+        EXCEPTIONS
+          cant_create_job  = 1
+          invalid_job_data = 2
+          jobname_missing  = 3
+          OTHERS           = 4.
+      IF sy-subrc EQ 0.
+        SUBMIT (sy-repid) "submit the same program
+        WITH p_mtart = p_mtart
+          TO SAP-SPOOL  DESTINATION lv_rqdest
+          LINE-SIZE lv_linsz
+          IMMEDIATELY 'X'
+          KEEP IN SPOOL 'X'
+          USER sy-uname VIA JOB lv_jobname NUMBER lv_jobcnt
+          WITHOUT SPOOL DYNPRO
+          WITH SELECTION-TABLE lt_param
+          AND RETURN.
+
+        CALL FUNCTION 'JOB_CLOSE' "job close
+          EXPORTING
+            jobcount             = lv_jobcnt
+            jobname              = lv_jobname
+            strtimmed            = 'X'
+          EXCEPTIONS
+            cant_start_immediate = 1
+            invalid_startdate    = 2
+            jobname_missing      = 3
+            job_close_failed     = 4
+            job_nosteps          = 5
+            job_notex            = 6
+            lock_failed          = 7
+            invalid_target       = 8
+            OTHERS               = 9.
+        IF sy-subrc <> 0.
+          RAISE job_cannot_be_closed.                    " Raise exception
+        ENDIF.
+      ELSE.
+        RAISE job_cannot_be_submitted.
+      ENDIF.
+*********** confirm job status if finished
+
+      DO 120 TIMES.
+        CALL FUNCTION 'BDL_READ_JOB_STATUS' "get job status
+          EXPORTING
+            jobname       = lv_jobname
+            jobnumber     = lv_jobcnt
+          IMPORTING
+            jobstatus     = lv_job
+          EXCEPTIONS
+            job_not_found = 1
+            OTHERS        = 2.
+        IF lv_job NE 'F'. "job finished
+          WAIT UP TO 1 SECONDS.
+          CONTINUE.
+        ELSE.
+          EXIT.
+        ENDIF.
+      ENDDO.
+**calculate report name in Spool table
+      IF lv_job EQ 'F'. "job finished
+        lv_len = strlen( sy-repid ) .
+        IF lv_len >= 9 .
+          CONCATENATE sy-repid+0(9)
+                      sy-uname+0(3) INTO lv_rq2name .
+        ELSE.
+          lv_len = 9 - lv_len.
+          DO lv_len TIMES .
+            CONCATENATE lv_temp '_' INTO lv_temp .
+          ENDDO.
+          CONCATENATE sy-repid lv_temp
+                      sy-uname INTO lv_rq2name .
+        ENDIF.
+
+*Get spool request from SPOOL table TSP01
+        REFRESH lt_tsp01.
+        SELECT rqident rq2name rqcretime FROM tsp01 INTO TABLE lt_tsp01
+                WHERE rq2name = lv_rq2name AND rqowner = sy-uname .
+*sort table to find latest spool no
+        SORT  lt_tsp01 BY rqcretime DESCENDING .
+*read table to find latest spool no
+        CLEAR ls_tsp01.
+        READ TABLE lt_tsp01 INTO ls_tsp01 INDEX 1.
+*get user desktop
+        CALL METHOD cl_gui_frontend_services=>get_desktop_directory
+          CHANGING
+            desktop_directory    = lv_string
+          EXCEPTIONS
+            cntl_error           = 1
+            error_no_gui         = 2
+            not_supported_by_gui = 3
+            OTHERS               = 4.
+        IF sy-subrc <> 0.
+* Implement suitable error handling here
+        ENDIF.
+        CALL METHOD cl_gui_cfw=>update_view.
+        CONCATENATE lv_string sy-uzeit INTO lv_string.
+        REFRESH lt_param.
+*Prepare selection table for PDF download
+        ls_param-selname = 'SPOOLNO'.
+        ls_param-sign    = 'I'.
+        ls_param-option  = 'EQ'.
+        ls_param-low     = ls_tsp01-rqident.
+        ls_param-high    = ''.
+        APPEND ls_param TO lt_param.
+
+        ls_param-selname = 'P_FILE'.
+        ls_param-sign    = 'I'.
+        ls_param-option  = 'EQ'.
+        ls_param-low     = lv_string.
+        ls_param-high    = ''.
+        APPEND ls_param TO lt_param.
+* Submit to PDF converted and download
+        SUBMIT rstxpdft4 WITH SELECTION-TABLE lt_param
+        AND RETURN.
+        IF sy-subrc <> 0.
+
+          MESSAGE  'PDF convert not possible' TYPE 'I'.
+        ENDIF.
+      ELSE.
+        MESSAGE  'PDF Can not be downloaded, you have selected huge data. Reduce data and try again' TYPE 'I'.
+      ENDIF.
+  ENDCASE.
+ENDFORM.                    "user command

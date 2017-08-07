@@ -1,0 +1,75 @@
+REPORT  ZALV_POPDIALOG.
+"ALV POPDIALOG
+
+TABLES: pa0002.
+
+TYPES: BEGIN OF ty_outtab,
+       pernr LIKE pa0002-pernr,
+       begda LIKE pa0002-begda,
+       endda LIKE pa0002-endda,
+       vorna LIKE pa0002-vorna,
+       nachn LIKE pa0002-nachn,
+      END   OF ty_outtab.
+
+DATA: gt_outtab TYPE STANDARD TABLE OF ty_outtab,
+      gr_table  TYPE REF TO cl_salv_table.
+*----------------------------------------------------------------------*
+* SELECTION-SCREEN                                                     *
+*----------------------------------------------------------------------*
+SELECTION-SCREEN BEGIN OF BLOCK gen WITH FRAME.
+SELECT-OPTIONS:s_pernr FOR pa0002-pernr.
+SELECTION-SCREEN END OF BLOCK gen.
+*----------------------------------------------------------------------*
+* START-OF-SELECTION                                                   *
+*----------------------------------------------------------------------*
+START-OF-SELECTION.
+  PERFORM select_data.
+*----------------------------------------------------------------------*
+* END-OF-SELECTION                                                     *
+*----------------------------------------------------------------------*
+END-OF-SELECTION.
+  PERFORM display_fullscreen.
+*&---------------------------------------------------------------------*
+*&      Form  select_data
+*----------------------------------------------------------------------*
+FORM select_data .
+  SELECT  pernr
+          begda
+          endda
+          vorna
+          nachn
+          FROM pa0002
+          INTO TABLE gt_outtab
+          WHERE pernr IN s_pernr.
+
+ENDFORM.                    " select_data
+*&---------------------------------------------------------------------*
+*&      Form  display_fullscreen
+*----------------------------------------------------------------------*
+FORM display_fullscreen .
+
+  DATA: lr_content TYPE REF TO cl_salv_form_element.
+
+  cl_salv_table=>factory(
+   EXPORTING
+      list_display = 'X'
+    IMPORTING
+      r_salv_table = gr_table
+    CHANGING
+      t_table      = gt_outtab ).
+
+  gr_table->set_screen_popup(
+    start_column = 1
+    end_column   = 100
+    start_line   = 1
+    end_line     = 20 ).
+
+  DATA: lr_selections TYPE REF TO cl_salv_selections.
+
+  lr_selections = gr_table->get_selections( ).
+  lr_selections->set_selection_mode(
+if_salv_c_selection_mode=>row_column ).
+
+  gr_table->display( ).
+
+ENDFORM.

@@ -1,0 +1,79 @@
+REPORT  z_alv_button.
+tables: scarr.
+TYPES: BEGIN OF ls_scarr ,
+        lv_carrid TYPE scarr-carrid,
+        lv_carrname TYPE scarr-carrname,
+        lv_currcode TYPE scarr-currcode,
+        lv_url TYPE scarr-url,
+
+  END OF ls_scarr.
+
+DATA: li_scarr TYPE TABLE OF scarr WITH HEADER LINE,
+      it_fieldcat TYPE slis_t_fieldcat_alv,
+        wa_fieldcat TYPE slis_fieldcat_alv.
+
+START-OF-SELECTION.
+  SELECT-OPTIONS s_carrid FOR scarr-CARRID.
+
+END-OF-SELECTION.
+ PERFORM display_alv.
+  PERFORM fieldcat.
+CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program = sy-repid
+      i_structure_name   = 'LS_scarr'
+      it_fieldcat        = it_fieldcat
+    TABLES
+      t_outtab           = li_scarr
+    EXCEPTIONS
+      program_error      = 1
+      OTHERS             = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+
+
+FORM display_alv.
+  SELECT *
+         FROM scarr
+         INTO CORRESPONDING FIELDS OF TABLE li_scarr
+         WHERE carrid IN s_carrid.
+ENDFORM.
+
+
+
+FORM fieldcat.
+
+  wa_fieldcat-col_pos = '1'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'CARRID'.
+  wa_fieldcat-seltext_m = 'ID'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '2'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'CARRNAME'.
+  wa_fieldcat-seltext_m = 'CARRNAME'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '3'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'CURRCODE'.
+  wa_fieldcat-seltext_m = 'CURRCODE'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '4'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SCARR'.
+  wa_fieldcat-fieldname = 'URL'.
+  wa_fieldcat-seltext_m = 'URL'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+ENDFORM.                    "FIELDC

@@ -1,0 +1,63 @@
+REPORT  zscreen_checkbox.
+
+TABLES: mara.
+DATA: kunnr TYPE kunnr,
+      name TYPE c,
+      city TYPE c,
+      address TYPE c,
+
+      ok_code LIKE sy-ucomm.
+
+DATA: name1 TYPE name1,
+      ort01 TYPE ort01,
+      adrnr TYPE adrnr.
+
+
+CALL SCREEN 110.
+
+DATA: lv_name1 TYPE name1,
+      lv_ort01 TYPE ort01,
+      lv_adrnr TYPE adrnr.
+
+
+*----------------------------------------------------------------------*
+*  MODULE CHECK_VALUES INPUT
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+MODULE check_values INPUT.
+
+
+  IF ok_code EQ 'DISPLAY'.
+
+    LEAVE TO LIST-PROCESSING.
+
+    SELECT SINGLE
+
+            name1
+            ort01
+            adrnr
+
+            FROM
+                kna1 INTO
+                      (lv_name1,
+                       lv_ort01,
+                       lv_adrnr)
+            WHERE kunnr = kunnr.
+
+    IF name EQ 'X'.
+      WRITE: lv_name1.
+      name1 = lv_name1.
+    ENDIF.
+    IF city EQ 'X'.
+      WRITE: lv_ort01.
+      ort01 = lv_ort01.
+    ENDIF.
+    IF address  EQ 'X'.
+      WRITE: lv_adrnr.
+      adrnr = lv_adrnr.
+    ENDIF.
+  ELSEIF ok_code EQ 'CANCEL ' OR ok_code EQ 'BACK'.
+    LEAVE PROGRAM.
+  ENDIF.
+ENDMODULE.                    "CHECK_VALUES INPUT

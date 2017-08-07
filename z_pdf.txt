@@ -1,0 +1,183 @@
+ DATA: i_otf TYPE itcoo OCCURS 0 WITH HEADER LINE,
+          i_tline TYPE TABLE OF tline WITH HEADER LINE,
+          i_receivers TYPE TABLE OF somlreci1 WITH HEADER LINE,
+          i_record LIKE solisti1 OCCURS 0 WITH HEADER LINE,
+
+          i_objpack LIKE sopcklsti1 OCCURS 0 WITH HEADER LINE,
+          i_objtxt LIKE solisti1 OCCURS 0 WITH HEADER LINE,
+          i_objbin LIKE solisti1 OCCURS 0 WITH HEADER LINE,
+          i_reclist LIKE somlreci1 OCCURS 0  WITH HEADER LINE,
+
+          wa_objhead TYPE soli_tab,
+          w_ctrlop TYPE ssfctrlop,
+          w_compop TYPE ssfcompop,
+          w_return TYPE ssfcrescl,
+          wa_doc_chng TYPE sodocchgi1,
+          w_data TYPE sodocchgi1,
+          wa_buffer TYPE string ,
+
+          v_form_name TYPE rs38l_fnam,
+          v_len_in LIKE sood-objlen,
+          v_len_out LIKE sood-objlen,
+          v_lines_txt TYPE i,
+          v_lines_bin TYPE i.
+
+    READ TABLE li_scarr INDEX  rs_selfield-tabindex.
+    BREAK-POINT.
+    CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+      EXPORTING
+        formname           = 'ZSPFLI_PRINT'
+*       VARIANT            = ' '
+*       DIRECT_CALL        = ' '
+      IMPORTING
+        fm_name            = v_form_name
+      EXCEPTIONS
+        no_form            = 1
+        no_function_module = 2
+        OTHERS             = 3.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+    w_ctrlop-getotf = 'x'.
+    w_ctrlop-no_dialog = 'x'.
+    w_compop-tdnoprev = 'x'.
+    CALL FUNCTION v_form_name
+      EXPORTING
+*       ARCHIVE_INDEX        =
+*       ARCHIVE_INDEX_TAB    =
+*       ARCHIVE_PARAMETERS   =
+        control_parameters   = w_ctrlop
+*       MAIL_APPL_OBJ        =
+*       MAIL_RECIPIENT       =
+*       MAIL_SENDER          =
+        output_options       = w_compop
+        user_settings        = 'X'
+        wa_spfli             = li_scarr-carrid
+      IMPORTING
+*       DOCUMENT_OUTPUT_INFO =
+        job_output_info      = w_return
+*       JOB_OUTPUT_OPTIONS   =
+      EXCEPTIONS
+        formatting_error     = 1
+        internal_error       = 2
+        send_error           = 3
+        user_canceled        = 4
+        OTHERS               = 5.
+    "  BREAK-POINT.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+    i_otf[] = w_return-otfdata[].
+    CALL FUNCTION 'CONVERT_OTF'
+      EXPORTING
+        format                = 'pdf'
+        max_linewidth         = 132
+*       ARCHIVE_INDEX         = ' '
+*       COPYNUMBER            = 0
+*       ASCII_BIDI_VIS2LOG    = ' '
+*       PDF_DELETE_OTFTAB     = ' '
+*       PDF_USERNAME          = ' '
+*       PDF_PREVIEW           = ' '
+*       USE_CASCADING         = ' '
+      IMPORTING
+        bin_filesize          = v_len_in
+*       BIN_FILE              =
+      TABLES
+        otf                   = i_otf
+        lines                 = i_tline
+      EXCEPTIONS
+        err_max_linewidth     = 1
+        err_format            = 2
+        err_conv_not_possible = 3
+        err_bad_otf           = 4
+        OTHERS                = 5.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+    LOOP AT i_tline.
+      TRANSLATE i_tline USING '~'.
+      CONCATENATE wa_buffer i_tline INTO wa_buffer.
+    ENDLOOP.
+    TRANSLATE wa_buffer USING '~'.
+    DO.
+      i_record = wa_buffer.
+      APPEND i_record.
+      SHIFT wa_buffer LEFT BY 255 PLACES.
+      IF wa_buffer IS INITIAL.
+        EXIT.
+      ENDIF.
+    ENDDO.
+    REFRESH: i_reclist,
+             i_objtxt,
+             i_objbin,
+             i_objpack.
+    CLEAR wa_objhead.
+    i_objbin[] = i_record[].
+    i_objtxt = 'test with pdf-eki'.
+    APPEND i_objtxt.
+    DESCRIBE TABLE i_objtxt LINES v_lines_txt.
+    READ TABLE i_objtxt INDEX v_lines_txt.
+    wa_doc_chng-obj_name = 'smartform'.
+    "wa_doc_chng-expriy_dat = sy-datum + 10.
+    wa_doc_chng-obj_descr = 'smartform'.
+    wa_doc_chng-sensitivty = 'f'.
+    wa_doc_chng-doc_size = v_lines_txt * 255.
+    CLEAR i_objpack-transf_bin.
+    i_objpack-head_start = 1.
+    i_objpack-head_num = 0.
+    i_objpack-body_num = v_lines_txt.
+    i_objpack-doc_type = 'raw'.
+    APPEND i_objpack.
+
+    i_objpack-transf_bin = 'x'.
+    i_objpack-head_start = 1.
+    i_objpack-head_num = 0.
+    i_objpack-body_start = 1.
+    DESCRIBE TABLE i_objbin LINES v_lines_bin.
+    READ TABLE i_objbin INDEX v_lines_bin.
+
+    i_objpack-doc_size = v_lines_bin * 255.
+    i_objpack-body_num = v_lines_bin.
+    i_objpack-doc_type = 'pdf'.
+    i_objpack-obj_name = 'smart'.
+    i_objpack-obj_descr = 'test'.
+    APPEND i_objpack.
+    CLEAR i_reclist.
+    i_reclist-receiver = 'ozenbatuhan1@gmail.com'.
+    i_reclist-rec_type = 'U'.
+    APPEND i_reclist.
+
+    CALL FUNCTION 'SO_NEW_DOCUMENT_ATT_SEND_API1'
+      EXPORTING
+        document_data                    = wa_doc_chng
+       put_in_outbox                    = 'x'
+       commit_work                      = 'x'
+*           IMPORTING
+*             SENT_TO_ALL                      =
+*             NEW_OBJECT_ID                    =
+      TABLES
+        packing_list                     = i_objpack
+       object_header                    = wa_objhead
+       contents_bin                     = i_objbin
+       contents_txt                     = i_objtxt
+*             CONTENTS_HEX                     =
+*             OBJECT_PARA                      =
+*             OBJECT_PARB                      =
+        receivers                        = i_reclist
+     EXCEPTIONS
+       too_many_receivers               = 1
+       document_not_sent                = 2
+       document_type_not_exist          = 3
+       operation_no_authorization       = 4
+       parameter_error                  = 5
+       x_error                          = 6
+       enqueue_error                    = 7
+       OTHERS                           = 8
+              .
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+      WRITE:/ 'GÖNDERÝLEMEDÝ'.
+    ENDIF.
+  ELSE.
+    WRITE: / 'MAÝL GÖNDERÝLDÝ'.
+

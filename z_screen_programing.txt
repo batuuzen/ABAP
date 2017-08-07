@@ -1,0 +1,150 @@
+REPORT  zscreen_programing1.
+
+TABLES: zemployees.
+
+DATA wa_employees LIKE zemployees.
+
+DATA: employes TYPE zemployees-employes,
+      vorname TYPE zemployees-vorname,
+      nachname TYPE zemployees-nachname,
+      title TYPE  zemployees-title,
+      dob TYPE zemployees-dob,
+      display TYPE c,
+      save TYPE c,
+      delete TYPE c,
+      update TYPE c,
+      clear TYPE c,
+      exit TYPE c,
+      custom TYPE c,
+      ok_code LIKE sy-ucomm.
+
+
+DATA: it_emp TYPE TABLE OF zemployees.
+
+START-OF-SELECTION.
+  PERFORM data_fetch.
+
+  CALL SCREEN 110.
+
+  DATA : o_cust TYPE REF TO cl_gui_custom_container,
+           o_alv TYPE REF TO cl_gui_alv_grid,
+           it1_emp TYPE TABLE OF zemployees.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  data_fetch
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM data_fetch .
+  SELECT * FROM zemployees INTO TABLE it1_emp.
+ENDFORM.                    "data_fetch
+
+
+
+
+*----------------------------------------------------------------------*
+*  MODULE STATUS_0110 OUTPUT
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+MODULE status_0110 OUTPUT.
+
+
+  CASE sy-ucomm.
+    WHEN 'EXIT'.
+      LEAVE PROGRAM.
+    WHEN 'DISPLAY'.
+      SELECT SINGLE
+                    employes
+                    vorname
+                    nachname
+                    title
+                    dob
+        FROM
+
+        zemployees
+        INTO (zemployees-employes,
+              zemployees-vorname,
+              zemployees-nachname,
+              zemployees-title,
+              zemployees-dob)
+
+        WHERE employes = zemployees-employes.
+
+    WHEN 'CLEAR'.
+      CLEAR zemployees.
+    WHEN 'SAVE'.
+
+
+
+      wa_employees-employes = zemployees-employes.
+      wa_employees-vorname = zemployees-vorname.
+      wa_employees-nachname = zemployees-nachname.
+      wa_employees-title = zemployees-title.
+      wa_employees-dob = zemployees-dob.
+
+      INSERT zemployees FROM wa_employees.
+
+      MESSAGE 'KAYIT TAMAMLANDI' TYPE 'S'.
+    WHEN 'DELETE'.
+
+      wa_employees-employes = zemployees-employes.
+
+      DELETE zemployees FROM wa_employees.
+      CLEAR zemployees.
+
+      MESSAGE 'KAYIT SILINDI' TYPE 'S'.
+    WHEN 'UPDATE'.
+
+      wa_employees-employes = zemployees-employes.
+      wa_employees-vorname = zemployees-vorname.
+      wa_employees-nachname = zemployees-nachname.
+      wa_employees-title = zemployees-title.
+      wa_employees-dob = zemployees-dob.
+
+      UPDATE zemployees FROM wa_employees.
+
+      MESSAGE 'KAYIT GUNCELLENDI' TYPE 'S'.
+  ENDCASE.
+
+  SET PF-STATUS 'STATUS'.
+  SET TITLEBAR 'TITLE'.
+ENDMODULE.                    "STATUS_0110 OUTPUT
+
+
+*----------------------------------------------------------------------*
+*  MODULE user_command_0110 INPUT
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+MODULE user_command_0110 INPUT.
+  " CASE ok_code.
+  " WHEN 'BACK' OR 'EXIT' OR 'CANCEL'.
+  "  LEAVE TO SCREEN 0.
+  " ENDCASE.
+ENDMODULE.                 " USER_COMMAND_0100  INPUT
+
+
+*----------------------------------------------------------------------*
+*  MODULE display_alv OUTPUT
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+MODULE display_alv OUTPUT.
+
+  CREATE OBJECT o_cust
+    EXPORTING
+      container_name = 'CUSTOM'.
+
+  CREATE OBJECT o_alv
+    EXPORTING
+      i_parent = o_cust.
+
+  CALL METHOD o_alv->set_table_for_first_display
+    EXPORTING
+      i_structure_name = 'ZEMPLOYEES'
+    CHANGING
+      it_outtab        = it1_emp.
+
+ENDMODULE.                    "display_alv OUTPUT

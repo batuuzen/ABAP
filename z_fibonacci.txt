@@ -1,0 +1,27 @@
+REPORT  Z_CALISMA_1.
+
+DATA: a TYPE i,
+
+b TYPE i,
+
+c TYPE i.
+
+"MOVE 1 TO b.
+
+WRITE: a.
+
+a = 0.
+
+b = 1.
+
+DO 11 TIMES.
+
+c = a + b.
+
+a = b.
+
+b = c.
+
+write: c.
+
+ENDDO.

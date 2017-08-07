@@ -1,0 +1,154 @@
+TABLES: spfli,zodev3.
+
+TYPES: BEGIN OF ls_spfli,
+        lv_carrid TYPE spfli-carrid,
+        lv_connid TYPE spfli-connid,
+        lv_cityfrom TYPE spfli-cityfrom,
+
+  END OF ls_spfli.
+
+
+DATA: li_spfli TYPE TABLE OF spfli WITH HEADER LINE,
+      it_fieldcat TYPE slis_t_fieldcat_alv,
+      wa_fieldcat TYPE slis_fieldcat_alv,
+      lv_layout TYPE slis_layout_alv,
+      li_zodev3 TYPE TABLE OF zodev3,
+      li_time_zodev3 TYPE TABLE OF zodev3 WITH HEADER LINE,
+      number TYPE i,
+      lv_zodev3 TYPE zodev3,
+     time1 TYPE t.
+
+time1 = sy-uzeit - 600.
+
+
+
+
+
+START-OF-SELECTION.
+  SELECT-OPTIONS s_carrid FOR spfli-carrid.
+
+END-OF-SELECTION.
+
+  PERFORM display_alv.
+  PERFORM fieldcat.
+  PERFORM insert_data.
+
+
+
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program = sy-repid
+      i_structure_name   = 'LS_SPFLI'
+      it_fieldcat        = it_fieldcat
+      is_layout          = lv_layout
+    TABLES
+      t_outtab           = li_spfli
+    EXCEPTIONS
+      program_error      = 1
+      OTHERS             = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  DISPLAY_ALV
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM display_alv.
+  SELECT *
+         FROM spfli
+         INTO CORRESPONDING FIELDS OF TABLE li_spfli
+         WHERE carrid IN s_carrid.
+ENDFORM.                    "DISPLAY_ALV
+
+*&---------------------------------------------------------------------*
+*&      Form  INSERT_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM insert_data.
+
+  SELECT time
+    FROM zodev3
+    INTO CORRESPONDING FIELDS OF TABLE  li_time_zodev3
+    WHERE  carrid IN s_carrid.
+  IF sy-subrc EQ 0.
+    LOOP AT li_time_zodev3.
+      IF time1 < li_time_zodev3-time.
+        MESSAGE 'KAYITLAR TABLOYA EKLENMEDÝ' TYPE 'E'.
+        RETURN.
+      ELSE.
+        LOOP AT li_spfli.
+          CALL FUNCTION 'NUMBER_GET_NEXT'
+            EXPORTING
+              nr_range_nr             = '01'
+              object                  = 'ZNUMBER'
+            IMPORTING
+              number                  = number
+            EXCEPTIONS
+              interval_not_found      = 1
+              number_range_not_intern = 2
+              object_not_found        = 3
+              quantity_is_0           = 4
+              quantity_is_not_1       = 5
+              interval_overflow       = 6
+              buffer_overflow         = 7
+              OTHERS                  = 8.
+          IF sy-subrc <> 0.
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+               WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+          ENDIF.
+          lv_zodev3-line_number = number.
+          lv_zodev3-carrid = li_spfli-carrid.
+          lv_zodev3-connid = li_spfli-connid.
+          lv_zodev3-cityfrom = li_spfli-cityfrom.
+          lv_zodev3-dat = sy-datum.
+          lv_zodev3-time = sy-uzeit.
+          lv_zodev3-user_bozen = sy-uname.
+
+          MODIFY zodev3 FROM lv_zodev3.
+          IF sy-subrc EQ 0.
+            MESSAGE 'Ýþlem baþarýlý' TYPE 'S'.
+          ENDIF.
+
+        ENDLOOP.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+ENDFORM.                    "INSERT_DATA
+*&---------------------------------------------------------------------*
+*&      Form  FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM fieldcat.
+
+  wa_fieldcat-col_pos = '1'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SPFLI'.
+  wa_fieldcat-fieldname = 'CARRID'.
+  wa_fieldcat-seltext_m = 'ID'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '2'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SPFLI'.
+  wa_fieldcat-fieldname = 'CONNID'.
+  wa_fieldcat-seltext_m = 'CON ID'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  wa_fieldcat-col_pos = '3'.
+  wa_fieldcat-row_pos = '1'.
+  wa_fieldcat-tabname = 'SPFLI'.
+  wa_fieldcat-fieldname = 'CITYFROM'.
+  wa_fieldcat-seltext_m = 'CTIY'.
+  APPEND wa_fieldcat TO it_fieldcat.
+  CLEAR wa_fieldcat.
+
+  lv_layout-colwidth_optimize = 'X'.
+ENDFORM.                    "FIELDCAT

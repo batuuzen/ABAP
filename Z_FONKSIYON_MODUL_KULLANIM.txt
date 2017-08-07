@@ -1,0 +1,73 @@
+*&----------------------------------------------------------------
+*& Report  Z_FONKSIYON_MODUL_KULLANIM
+*&
+*&----------------------------------------------------------------
+*&
+*&
+*&----------------------------------------------------------------
+
+REPORT  Z_FONKSIYON_MODUL_KULLANIM.
+
+PARAMETERS:
+  pa_sayi1  TYPE i,
+  pa_op    TYPE c LENGTH 1,
+  pa_sayi2  TYPE i.
+
+DATA gv_sonuc TYPE p LENGTH 16 DECIMALS 2.
+
+IF ( pa_op = '+' OR
+     pa_op = '-' OR
+     pa_op = '*' OR
+     pa_op = '/' AND pa_sayi2 <> 0 OR
+     pa_op = '%' OR
+     pa_op = 'P' ).
+
+  CASE pa_op.
+    WHEN '+'.
+      gv_sonuc = pa_sayi1 + pa_sayi2.
+    WHEN '-'.
+      gv_sonuc = pa_sayi1 - pa_sayi2.
+    WHEN '*'.
+      gv_sonuc = pa_sayi1 * pa_sayi2.
+    WHEN '/'.
+      gv_sonuc = pa_sayi1 / pa_sayi2.
+    WHEN 'P'.
+      CALL FUNCTION 'Z_SAYININ_USSUNU_AL'
+        EXPORTING
+          IV_SAYI                   = pa_sayi1
+          IV_US                     = pa_sayi2
+       IMPORTING
+          EV_SONUC                  = gv_sonuc
+       eXCEPTIONS
+         SONUC_HESAPLANAMADI       = 1
+         OTHERS                    = 2
+                .
+      IF SY-SUBRC <> 0.
+         write / 'Sonuc Hesaplanamadi'.
+      ENDIF.
+
+
+    WHEN '%'.
+      CALL FUNCTION 'Z_YUZDE_HESAPLA'
+        EXPORTING
+          IV_SAYI                    = pa_sayi1
+          IV_MAKSIMUM                = pa_sayi2
+       IMPORTING
+          EV_YUZDE                   = gv_sonuc
+        EXCEPTIONS
+          SIFIRLA_BOLME_HATASI       = 1
+          OTHERS                     = 2
+                .
+      IF SY-SUBRC <> 0.
+         WRITE / 'Sifirla Bolme Hatasi Hesaplanamadi'.
+      ENDIF.
+
+  ENDCASE.
+
+  WRITE: 'Sonuc  : ', gv_sonuc.
+
+ELSEIF  pa_op = '/'  AND  pa_sayi2 = 0.
+  WRITE  'Sifirla bolme yapilamaz!'.
+ELSE.
+  WRITE  'Gecersiz operator!'.
+ENDIF.

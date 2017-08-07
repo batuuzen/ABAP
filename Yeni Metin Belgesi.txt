@@ -1,0 +1,43 @@
+PARAMETERS: final type i. 
+*&finalin %50si
+PARAMETERS: vize TYPE i. 
+*&vizenin %30
+PARAMETERS: odev TYPE i. 
+*&ödevin %10
+PARAMETERS: quiz TYPE i. 
+*&quizin %10
+
+DATA: sonuc TYPE i.
+
+sonuc = final*50.
+sonuc = sonuc + ( vize*30 ) .
+sonuc = sonuc + ( odev*10 ).
+sonuc = sonuc + ( quiz*10 ).
+sonuc=sonuc/100.
+
+if sonuc > 80.
+  WRITE'aa'.
+  ENDIF.
+  
+IF sonuc BETWEEN 80 AND 70 .
+WRITE 'ba'.
+ENDIF.
+
+IF sonuc BETWEEN 70 AND 80.
+WRITE'ba'.
+ENDIF.
+
+IF sonuc BETWEEN 70 AND 60.
+WRITE 'bb' .
+ENDIF.
+
+IF sonuc BETWEEN 50 AND 60.
+WRITE 'cb'.
+ENDIF.
+
+IF sonuc BETWEEN 50 AND 40.
+  WRITE 'CC'.
+
+ENDIF.
+
+sonuc = ( final * 50 ) + ( vize * 30 ) + ( odev * 10 ) + ( quiz * 10 )

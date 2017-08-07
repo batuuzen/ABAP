@@ -1,0 +1,118 @@
+REPORT  z_excel2.
+
+TYPE-POOLS: truxs.
+
+PARAMETERS: p_file TYPE  rlgrap-filename.
+
+TYPES: BEGIN OF t_datatab,
+      col1(20)    TYPE c,
+      col2(3)    TYPE c,
+      col3(4)    TYPE n,
+      col4(20)    TYPE c,
+      col5(20)  TYPE c,
+      END OF t_datatab.
+
+*TYPES: BEGIN OF ls_spfli,
+*        lv_carrid TYPE spfli-carrid,
+*        lv_connid TYPE spfli-connid,
+*        lv_cityfrom TYPE spfli-cityfrom,
+*
+*  END OF ls_spfli.
+
+
+DATA: li_zodev3 TYPE TABLE OF zodev3,
+      number TYPE i,
+      lv_zodev3 TYPE zodev3.
+
+DATA: it_datatab TYPE TABLE OF t_datatab WITH HEADER LINE,
+      wa_datatab TYPE t_datatab.
+
+DATA: it_raw TYPE truxs_t_text_data.
+
+* At selection screen
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+  CALL FUNCTION 'F4_FILENAME'
+    EXPORTING
+      field_name = 'P_FILE'
+    IMPORTING
+      file_name  = p_file.
+
+
+***********************************************************************
+*START-OF-SELECTION.
+START-OF-SELECTION.
+
+  CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'
+    EXPORTING
+*     I_FIELD_SEPERATOR    =
+      i_line_header        = 'X'
+      i_tab_raw_data       = it_raw
+      i_filename           = p_file
+    TABLES
+      i_tab_converted_data = it_datatab[]
+    EXCEPTIONS
+      conversion_failed    = 1
+      OTHERS               = 2.
+
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+
+***********************************************************************
+* END-OF-SELECTION.
+END-OF-SELECTION.
+*  LOOP AT it_datatab INTO wa_datatab.
+*    WRITE:/ wa_datatab-col1,
+*            wa_datatab-col2,
+*            wa_datatab-col3.
+*  ENDLOOP.
+
+  LOOP AT it_datatab.
+    CALL FUNCTION 'NUMBER_GET_NEXT'
+      EXPORTING
+        nr_range_nr             = '01'
+        object                  = 'ZNUMBER'
+      IMPORTING
+        number                  = number
+      EXCEPTIONS
+        interval_not_found      = 1
+        number_range_not_intern = 2
+        object_not_found        = 3
+        quantity_is_0           = 4
+        quantity_is_not_1       = 5
+        interval_overflow       = 6
+        buffer_overflow         = 7
+        OTHERS                  = 8.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+         WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+    lv_zodev3-line_number = number.
+    lv_zodev3-carrid      = it_datatab-col2.
+    lv_zodev3-connid      = it_datatab-col3.
+    lv_zodev3-cityfrom    = it_datatab-col5.
+    lv_zodev3-dat         = sy-datum.
+    lv_zodev3-time        = sy-uzeit.
+    lv_zodev3-user_bozen  = sy-uname.
+
+    MODIFY zodev3 FROM lv_zodev3.
+    IF sy-subrc EQ 0.
+      MESSAGE 'Ýþlem baþarýlý' TYPE 'S'.
+    ENDIF.
+
+  ENDLOOP.
+
+  LOOP AT it_datatab.
+    WRITE:/
+            lv_zodev3-line_number,
+            it_datatab-col2,
+            it_datatab-col3,
+            it_datatab-col5,
+            lv_zodev3-dat,
+            lv_zodev3-time,
+            lv_zodev3-user_bozen.
+
+
+  ENDLOOP.

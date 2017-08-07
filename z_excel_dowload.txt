@@ -1,0 +1,22 @@
+REPORT  z_excel.
+
+TABLES  : spfli.
+
+
+DATA: li_spfli LIKE spfli OCCURS 0 WITH HEADER LINE.
+
+SELECT * FROM spfli INTO TABLE li_spfli UP TO 10 ROWS.
+
+CALL FUNCTION 'WS_DOWNLOAD'
+ EXPORTING
+
+   filename                      = 'C:\deneme\Deneme.xls'
+   filetype                      = 'DAT'
+
+  TABLES
+    data_tab                      = li_spfli
+
+          .
+IF sy-subrc <> 0.
+* Implement suitable error handling here
+ENDIF.

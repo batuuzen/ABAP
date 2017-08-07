@@ -1,0 +1,56 @@
+*&-------------------------------------------------------------------
+*& Report  Z_ABAP_VERI_TURLERI
+*&
+*&-------------------------------------------------------------------
+*&
+*&
+*&-------------------------------------------------------------------
+
+REPORT  Z_ABAP_VERI_TURLERI.
+
+*Tam veri turleri ile tanimlanan program degiskenleri
+
+data : gv_tarih            type d value '20120406',
+       gv_zaman            type t value '083243',
+       gv_tamsayi          type i value 678,
+       gv_ondalikli        type f value '23.56',
+       gv_karakter_dizisi  type string    value 'ABAP Veri Turleri',
+       gv_bit_dizisi       type xstring   value '0009EF'.
+
+
+*Tam olmayan veri turleri ile tanimlanan program degiskenleri
+
+data : gv_karakter            type c length 5 value 'ABCDE',
+       gv_numerik_karakter    type n length 6 value '063000',
+       gv_bit_dizisi_x        type x value is initial,
+       gv_ondalikli_p         type p length 4 decimals 3 value '908.561'.
+
+*Degisken degerlerinin ABAP Liste ciktisi ekranina yazdirilmasi
+
+write / 'TAM VERI TURLERI ILE TANIMLANAN DEGISKENLER' color col_heading.
+
+skip 1.
+uline.
+skip 1.
+
+write :/ 'gv_tarih            : '   , gv_tarih,
+       / 'gv_zaman            : '   , gv_zaman,
+       / 'gv_tamsayi          : '   , gv_tamsayi,
+       / 'gv_ondalikli        : '   , gv_ondalikli,
+       / 'gv_karakter_dizisi  : '   , gv_karakter_dizisi,
+       / 'gv_bit_dizisi       : '   , gv_bit_dizisi,
+       / 'gv_karakter         : '   , gv_karakter,
+       / 'gv_bit_dizisi       : '   , gv_bit_dizisi.
+
+skip 4.
+
+write / 'TAM OLMAYAN VERI TURLERI ILE TANIMLANAN DEGISKENLER' color col_heading.
+
+skip 1.
+uline.
+skip 1.
+
+write :/ 'gv_karakter         : '   , gv_karakter,
+       / 'gv_numerik_karakter : '   , gv_numerik_karakter,
+       / 'gv_bit_dizisi_x     : '   , gv_bit_dizisi_x,
+       / 'gv_ondalikli_p      : '   , gv_ondalikli_p.
